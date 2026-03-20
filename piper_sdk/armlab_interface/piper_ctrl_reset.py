@@ -26,7 +26,7 @@ if __name__ == "__main__":
         msg = piper.GetArmHighSpdInfoMsgs()
         msg_hz = msg.Hz
     joint_positions = [msg.motor_1.pos, msg.motor_2.pos, msg.motor_3.pos, msg.motor_4.pos, msg.motor_5.pos, msg.motor_6.pos]
-    logger.info(f"Target: {target_joint_positions}, Current: {joint_positions}, Hz: {msg.Hz}")
+    logger.info(f"Target Joint Positions: {target_joint_positions}, Current Joint Positions: {joint_positions}")
 
     max_abs_joint_position_error = max(abs(jp - tjp) for jp, tjp in zip(joint_positions, target_joint_positions))
     initial_error = max_abs_joint_position_error
@@ -34,11 +34,21 @@ if __name__ == "__main__":
 
     # Reset the arm only if the initial error is below the threshold
     if initial_error > initial_error_threshold:
-        logger.warning(f"The Piper arm is not roughly at zero position (Error: {initial_error:.2f}). Aborting reset.")
+        logger.warning(f"The Piper arm is not roughly at zero position. Aborting reset. Please move the arm closer to zero position.")
+        piper.DisconnectPort()
     else:
+        logger.info("Releasing motors.")
+        # Release: Slowly release motors to allow settling to rest position
+        Kp = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        Kd = [0.8, 0.8, 0.8, 0.8, 0.8, 0.8]
+        elapsed_time = 0.0
+        while elapsed_time < 2.0:
+            for i in range(6):
+                piper.JointMitCtrl(i+1,target_joint_positions[i],target_joint_velocities[i],Kp[i],Kd[i],target_joint_torques[i])
+                time.sleep(0.016)
+                elapsed_time += 0.016
+        
         logger.info("Resetting Piper Arm...")
         piper.MotionCtrl_1(0x02,0,0)
         logger.info("Piper Arm Reset Complete!!!!")
-
-    return
     
